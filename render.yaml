@@ -1,0 +1,30 @@
+# Render Blueprint. In the Render dashboard: New -> Blueprint -> point at
+# this repo. Render creates both services in one pass. Render's blueprint
+# field references only expose bare hostnames (not a full https:// URL), so
+# CORS_ALLOWED_ORIGINS and API_BASE_URL are left as placeholders below --
+# after the first deploy, copy each service's real URL from the Render
+# dashboard into the other service's env var and redeploy. Full steps are in
+# README.md.
+services:
+  - type: web
+    name: sahayata-atlas-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://REPLACE-WITH-FRONTEND-URL.onrender.com"
+      - key: NOMINATIM_USER_AGENT
+        value: "SahayataAtlas/1.0 (contact: set-a-real-contact-email@example.org)"
+
+  - type: web
+    name: sahayata-atlas-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: "bash build.sh"
+    staticPublishPath: .
+    envVars:
+      - key: API_BASE_URL
+        value: "https://REPLACE-WITH-BACKEND-URL.onrender.com"
