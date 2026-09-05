@@ -1,4 +1,4 @@
-"""
+ """
 Location resolution.
 
 - City mode: geocode via Nominatim, restricted to India (countrycodes=in).
@@ -61,18 +61,32 @@ def validate_coordinates(latitude: float, longitude: float) -> None:
         raise LocationError(400, "INVALID_REQUEST", "Longitude must be between -180 and 180.")
 
 
+def _geocoder_base_url() -> str:
+    """LocationIQ when a key is configured (production, avoids Nominatim's
+    datacenter-IP blocking), otherwise plain Nominatim (local development)."""
+    if settings.locationiq_api_key:
+        return settings.locationiq_base_url
+    return settings.nominatim_base_url
+
+
+def _geocoder_params(base: dict) -> dict:
+    if settings.locationiq_api_key:
+        return {"key": settings.locationiq_api_key, **base}
+    return base
+
+
 async def resolve_city(city: str) -> ResolvedLocation:
-    params = {
+    params = _geocoder_params({
         "q": city,
         "format": "jsonv2",
         "countrycodes": "in",
         "addressdetails": 1,
         "limit": 1,
-    }
+    })
     headers = {"User-Agent": settings.nominatim_user_agent}
     try:
         async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
-            resp = await client.get(f"{settings.nominatim_base_url}/search", params=params, headers=headers)
+            resp = await client.get(f"{_geocoder_base_url()}/search", params=params, headers=headers)
     except httpx.TimeoutException as e:
         raise LocationError(504, "UPSTREAM_TIMEOUT", "Location lookup timed out. Please try again.") from e
     except httpx.HTTPError as e:
@@ -116,11 +130,13 @@ async def resolve_coordinates(latitude: float, longitude: float) -> ResolvedLoca
         raise LocationError(422, "LOCATION_OUTSIDE_SERVICE_AREA",
                              "These coordinates are outside the supported service area.")
 
-    params = {"lat": latitude, "lon": longitude, "format": "jsonv2", "addressdetails": 1, "zoom": 10}
+    params = _geocoder_params({
+        "lat": latitude, "lon": longitude, "format": "jsonv2", "addressdetails": 1, "zoom": 10,
+    })
     headers = {"User-Agent": settings.nominatim_user_agent}
     try:
         async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
-            resp = await client.get(f"{settings.nominatim_base_url}/reverse", params=params, headers=headers)
+            resp = await client.get(f"{_geocoder_base_url()}/reverse", params=params, headers=headers)
     except httpx.TimeoutException as e:
         raise LocationError(504, "UPSTREAM_TIMEOUT", "Location lookup timed out. Please try again.") from e
     except httpx.HTTPError as e:
