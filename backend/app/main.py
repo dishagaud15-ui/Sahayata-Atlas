@@ -5,8 +5,9 @@ Implements the Backend Requirements and Frontend API Agreement (v1).
 import time
 import uuid
 import logging
+import os
+import sentry_sdk
 from datetime import datetime, timezone
-
 from fastapi import FastAPI, Request, Query, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,11 @@ from app.aggregator import aggregate_resources, UpstreamError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sahayata")
-
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN"),
+    enable_logs=True,
+    traces_sample_rate=1.0,
+)
 app = FastAPI(title="Sahayata Atlas API", version="1.0.0")
 
 app.add_middleware(
